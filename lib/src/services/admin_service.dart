@@ -52,7 +52,7 @@ class AdminService {
     
     return query.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
       return snapshot.docs
-          .map((doc) => BookingModel.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) => BookingModel.fromDoc(doc))
           .toList();
     });
   }

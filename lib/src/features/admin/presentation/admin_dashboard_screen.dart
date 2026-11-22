@@ -167,7 +167,7 @@ class _Overview extends StatelessWidget {
             final docs = snap.data!.docs;
             if (docs.isEmpty) return const Text('No bookings yet.', style: TextStyle(fontSize: 13, color: AppColors.text3));
             return Column(children: docs.map((d) {
-              final b = BookingModel.fromMap(d.data() as Map<String, dynamic>);
+              final b = BookingModel.fromDoc(d);
               Color col;
               switch (b.status) {
                 case BookingStatus.completed: col = AppColors.success; break;
@@ -457,7 +457,7 @@ class _BookingsTab extends StatelessWidget {
           itemCount: docs.length,
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (ctx, i) {
-            final b = BookingModel.fromMap(docs[i].data() as Map<String, dynamic>);
+            final b = BookingModel.fromDoc(docs[i]);
             Color col;
             switch (b.status) {
               case BookingStatus.completed: col = AppColors.success; break;

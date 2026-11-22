@@ -72,8 +72,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .get();
 
       if (bookingDoc.exists) {
-        final data = bookingDoc.data()!;
-        final booking = BookingModel.fromMap(data);
+        final booking = BookingModel.fromDoc(bookingDoc);
 
         setState(() {
           _isProvider = user.id == booking.providerId;

@@ -136,7 +136,7 @@ class FirebaseBookingService implements BookingService {
         .snapshots()
         .map((snapshot) {
           final bookings = snapshot.docs
-              .map((doc) => BookingModel.fromMap(doc.data()))
+              .map((doc) => BookingModel.fromDoc(doc))
               .toList();
           bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return bookings;
@@ -151,7 +151,7 @@ class FirebaseBookingService implements BookingService {
     final doc = await _firestore.collection('bookings').doc(bookingId).get();
     if (!doc.exists) return;
 
-    final booking = BookingModel.fromMap(doc.data()!);
+    final booking = BookingModel.fromDoc(doc);
     final updateData = <String, dynamic>{'status': status.name};
 
     // Track timestamps for status changes

@@ -71,7 +71,7 @@ class BookingDetailsScreen extends StatelessWidget {
             ElevatedButton(onPressed: () => ctx.go('/bookings'), child: const Text('Back to Bookings')),
           ]));
 
-          final b = BookingModel.fromMap(snap.data!.data() as Map<String, dynamic>);
+          final b = BookingModel.fromDoc(snap.data!);
           final col = _statusColor(b.status);
 
           return SingleChildScrollView(
@@ -92,7 +92,7 @@ class BookingDetailsScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Text(_statusLabel(b.status), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: col)),
                   const Spacer(),
-                  Text('# ${b.id.substring(0,8).toUpperCase()}', style: Theme.of(ctx).textTheme.bodySmall),
+                  Text('# ${(b.id.length > 8 ? b.id.substring(0,8) : b.id).toUpperCase()}', style: Theme.of(ctx).textTheme.bodySmall),
                 ]),
               ),
               const SizedBox(height: 16),
@@ -189,7 +189,7 @@ class BookingDetailsScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance.collection('bookings').doc(bookingId).snapshots(),
         builder: (ctx, snap) {
           if (!snap.hasData || !snap.data!.exists) return const SizedBox.shrink();
-          final b = BookingModel.fromMap(snap.data!.data() as Map<String, dynamic>);
+          final b = BookingModel.fromDoc(snap.data!);
           return _ActionBar(b: b, isProvider: isProvider);
         },
       ),

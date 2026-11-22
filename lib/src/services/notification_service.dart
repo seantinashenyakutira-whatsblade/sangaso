@@ -101,7 +101,7 @@ class FirebaseNotificationService implements NotificationService {
         .snapshots()
         .map((snapshot) {
           return snapshot.docs
-              .map((doc) => NotificationModel.fromMap(doc.data()))
+              .map((doc) => NotificationModel.fromDoc(doc))
               .toList();
         });
   }
