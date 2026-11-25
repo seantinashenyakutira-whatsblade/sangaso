@@ -95,9 +95,11 @@ flutter run -d chrome --dart-define=SANGASO_USE_EMULATORS=true
 ```
 
 `SANGASO_EMULATOR_HOST` (environment variable or `--dart-define`) overrides the
-default. It accepts a bare host or an `http://` URL. All emulator calls remain
-inside the explicit `SANGASO_USE_EMULATORS` branch; with the flag unset the app
-uses its normal Firebase configuration unchanged.
+default. It accepts a bare host or an `http://` URL. In emulator mode the app
+also initializes Firebase with `projectId: demo-sangaso-local` and fake app
+metadata, so documents match this seed. All emulator calls remain inside the
+explicit `SANGASO_USE_EMULATORS` branch; with the flag unset the app uses its
+normal production Firebase configuration unchanged.
 
 ## Rules safety
 

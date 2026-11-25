@@ -27,6 +27,17 @@ const String _kEmulatorHostOverride = 'SANGASO_EMULATOR_HOST';
 const String _kAndroidEmulatorHost = '10.0.2.2';
 const String _kLocalHost = 'localhost';
 const int _kAuthEmulatorPort = 9099;
+
+// Emulator-only Firebase options. The Auth/Firestore emulators accept fake
+// app metadata; the critical part is the demo project id so documents land in
+// the same namespace that local-test/seed.js writes to.
+const FirebaseOptions _kLocalEmulatorOptions = FirebaseOptions(
+  apiKey: 'fake-api-key-for-local-emulators',
+  appId: '1:000000000000:android:0000000000000000000000',
+  messagingSenderId: '000000000000',
+  projectId: 'demo-sangaso-local',
+  storageBucket: 'demo-sangaso-local.appspot.com',
+);
 const int _kFirestoreEmulatorPort = 8080;
 const int _kStorageEmulatorPort = 9199;
 
@@ -78,7 +89,9 @@ String get emulatorHost {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: useEmulators ? _kLocalEmulatorOptions : DefaultFirebaseOptions.currentPlatform,
+  );
 
   // FCM background handler must be registered before runApp so background
   // deliveries (data-only, sent by the trusted backend) have a handler.
