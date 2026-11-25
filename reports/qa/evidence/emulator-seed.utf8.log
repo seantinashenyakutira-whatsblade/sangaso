@@ -1,0 +1,9 @@
+﻿Firestore seeded users/fAJCOMjgU3bsanV2wUwM3kTZfcQ3 role=seeker (projects/demo-sangaso-local/databases/(default)/documents/users/fAJCOMjgU3bsanV2wUwM3kTZfcQ3)
+Firestore seeded users/JFWkM6PXhZ3EGHYG9HLa3BwhEQN1 role=provider (projects/demo-sangaso-local/databases/(default)/documents/users/JFWkM6PXhZ3EGHYG9HLa3BwhEQN1)
+Firestore seeded services/svc-clean-001 providerUid=JFWkM6PXhZ3EGHYG9HLa3BwhEQN1 (projects/demo-sangaso-local/databases/(default)/documents/services/svc-clean-001)
+Firestore seeded services/svc-plumb-001 providerUid=JFWkM6PXhZ3EGHYG9HLa3BwhEQN1 (projects/demo-sangaso-local/databases/(default)/documents/services/svc-plumb-001)
+Firestore seeded services/svc-elec-001 providerUid=JFWkM6PXhZ3EGHYG9HLa3BwhEQN1 (projects/demo-sangaso-local/databases/(default)/documents/services/svc-elec-001)
+Auth EMULATOR users verified with emailVerified=true and working passwords.
+Seed verification PASS: 2 users, 3 services.
+SEEKER_UID=fAJCOMjgU3bsanV2wUwM3kTZfcQ3
+PROVIDER_UID=JFWkM6PXhZ3EGHYG9HLa3BwhEQN1

@@ -1,0 +1,17 @@
+﻿i  emulators: Starting emulators: auth, firestore
+i  emulators: Detected demo project ID "demo-sangaso-local", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+!  firestore: Did not find a Cloud Firestore rules file specified in a firebase.json config file.
+!  firestore: The emulator will default to allowing all reads and writes.
++  firestore: Firestore Emulator was started in standard edition.
++  firestore: Firestore Emulator UI websocket is running on 9150.
+
+   All emulators ready! It is now safe to connect your app.
+   View Emulator UI at http://127.0.0.1:4000/
+
+   Authentication   127.0.0.1:9099   http://127.0.0.1:4000/auth
+   Firestore        127.0.0.1:8080   http://127.0.0.1:4000/firestore
+
+   Emulator Hub host: 127.0.0.1 port: 4400
+   Other reserved ports: 4500, 9150
+
+Note: Storage emulator was not started. Authentication and Firestore only.

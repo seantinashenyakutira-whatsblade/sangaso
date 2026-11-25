@@ -1,0 +1,6 @@
+# Keep only the sanitized QA logs referenced by the report. All other local
+# logs and screenshots remain ignored unless explicitly reviewed and added.
+*.log
+!emulator-seed.utf8.log
+!emulator-run.utf8.log
+!apk-install-v2.log
