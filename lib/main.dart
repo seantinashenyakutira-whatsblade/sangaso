@@ -23,7 +23,9 @@ import 'src/services/review_service.dart';
 import 'src/services/service_service.dart';
 
 const String _kEmulatorFlag = 'SANGASO_USE_EMULATORS';
-const String _kEmulatorHost = 'localhost';
+const String _kEmulatorHostOverride = 'SANGASO_EMULATOR_HOST';
+const String _kAndroidEmulatorHost = '10.0.2.2';
+const String _kLocalHost = 'localhost';
 const int _kAuthEmulatorPort = 9099;
 const int _kFirestoreEmulatorPort = 8080;
 const int _kStorageEmulatorPort = 9199;
@@ -43,6 +45,37 @@ bool get useEmulators {
   return Platform.environment[_kEmulatorFlag] == 'true';
 }
 
+/// Firebase SDKs expect a bare host, not a URL. Accept either form from the
+/// override so `--dart-define=SANGASO_EMULATOR_HOST=http://10.0.2.2` and a
+/// plain `10.0.2.2` both work.
+String _normaliseEmulatorHost(String value) {
+  var candidate = value.trim();
+  if (candidate.isEmpty) return '';
+  if (!candidate.contains('://')) candidate = 'http://$candidate';
+  final uri = Uri.tryParse(candidate);
+  final host = uri?.host ?? '';
+  return host.isEmpty ? candidate.replaceAll(RegExp(r'^https?://'), '') : host;
+}
+
+/// Resolves the emulator host only when emulator mode is explicitly enabled.
+/// Android runs the emulator on the Windows host, so `localhost` inside the
+/// AVD would point at the device itself. Desktop/web keep `localhost`.
+String get emulatorHost {
+  const compileTimeOverride = String.fromEnvironment(
+    _kEmulatorHostOverride,
+    defaultValue: '',
+  );
+  final override = kIsWeb
+      ? compileTimeOverride
+      : (compileTimeOverride.isNotEmpty
+          ? compileTimeOverride
+          : Platform.environment[_kEmulatorHostOverride] ?? '');
+  final normalised = _normaliseEmulatorHost(override);
+  if (normalised.isNotEmpty) return normalised;
+  if (!kIsWeb && Platform.isAndroid) return _kAndroidEmulatorHost;
+  return _kLocalHost;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -52,9 +85,18 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(fcmBackgroundHandler);
 
   if (useEmulators) {
-    await FirebaseAuth.instance.useAuthEmulator(_kEmulatorHost, _kAuthEmulatorPort);
-    FirebaseFirestore.instance.useFirestoreEmulator(_kEmulatorHost, _kFirestoreEmulatorPort);
-    FirebaseStorage.instance.useStorageEmulator(_kEmulatorHost, _kStorageEmulatorPort);
+    // Host resolution is intentionally scoped to the opt-in branch. With the
+    // flag unset the app continues to use the normal Firebase configuration.
+    final host = emulatorHost;
+    await FirebaseAuth.instance.useAuthEmulator(host, _kAuthEmulatorPort);
+    FirebaseFirestore.instance.useFirestoreEmulator(
+      host,
+      _kFirestoreEmulatorPort,
+    );
+    FirebaseStorage.instance.useStorageEmulator(
+      host,
+      _kStorageEmulatorPort,
+    );
   }
 
   // Branded authentication-email client. Present in every build, but the

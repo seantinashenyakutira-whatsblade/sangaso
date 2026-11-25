@@ -1,40 +1,108 @@
 # Sangaso local emulator test harness
 
-Isolated, opt-in Firebase emulator environment for local automated checks.
-Production Firebase is never contacted by this folder.
+Isolated, opt-in Firebase emulator environment for local Android QA.
+Project is hard-pinned to `demo-sangaso-local`. Production Firebase is never
+contacted by this folder: `firebase.json` deliberately has **no deploy targets**,
+and the seed/verify scripts reject any endpoint other than loopback.
 
 ## Fixed parameters
-- Explicit project id: `demo-sangaso-local`
-- Auth emulator: `localhost:9099`
-- Firestore emulator: `localhost:8080`
-- Storage emulator: `localhost:9199`
-- Emulator UI (localhost only): http://127.0.0.1:4000
-- Rules files are intentionally permissive and marked NEVER DEPLOY.
 
-## How to use
-Requirements: Node 20+ and a JDK 21+ on PATH (current firebase-tools refuses
-older JDKs). Android/Gradle builds elsewhere use JDK 17 — set Java 21 only for
-the emulator shell.
+- Project: `demo-sangaso-local`
+- Auth emulator: `127.0.0.1:9099`
+- Firestore emulator: `127.0.0.1:8080`
+- Emulator UI (loopback only): http://127.0.0.1:4000
+- Storage emulator is **not** started or configured; add it only if a test requires it.
+
+## Requirements
+
+Reuse the existing tooling. Verified on this PC: Node v22.23.2, Firebase CLI
+15.34.0, Temurin JDK 21.0.12 (emulator shell only). Android/Gradle builds use
+JDK 17. Do not install another Android SDK or system image.
+
+## Local fake credentials (untracked)
+
+Create `local-test/fake-credentials.local.json` in this folder. It is ignored by
+Git and must never be committed. Only `@demo-sangaso-local.test` addresses are
+accepted by the seed script.
+
+```json
+{
+  "seeker": {
+    "email": "seeker@demo-sangaso-local.test",
+    "password": "<local-only-password>"
+  },
+  "provider": {
+    "email": "provider@demo-sangaso-local.test",
+    "password": "<local-only-password>"
+  }
+}
+```
+
+Use a different path via `SANGASO_FAKE_CREDENTIALS_FILE` if preferred.
+
+## Start and seed
 
 ```powershell
-cd local-test
-npm install
-set "JAVA_HOME=C:\path\to\jdk-21"
-firebase emulators:start --project demo-sangaso-local
-node seed.js   # deterministic REST seed: 3 services + 2 demo users
+cd C:\Users\MRSEANNYAKUTIRA\Desktop\Sangaso\app\local-test
+firebase emulators:start --project demo-sangaso-local --only auth,firestore
 ```
-Verified on this PC (17 Oct 2026): auth 9099 + firestore 8080 started
-successfully with Temurin JDK 21.0.12; seed REST round-trips confirmed.
 
-Then run the app in emulator mode (explicit, no fallback):
-```powershell
-flutter run --dart-define=SANGASO_USE_EMULATORS=true
-```
-or set the environment variable `SANGASO_USE_EMULATORS=true` before launching.
-Without the flag, the app never touches these endpoints and there is no
-automatic fallback.
+In a second terminal:
 
-## SDK check
 ```powershell
-firebase emulators:exec --project demo-sangaso-local "node seed.js"
+cd C:\Users\MRSEANNYAKUTIRA\Desktop\Sangaso\app\local-test
+node seed.js
 ```
+
+The seed now:
+
+- creates/updates both Auth Emulator accounts and sets `emailVerified: true`;
+- verifies both passwords through the Auth Emulator REST API;
+- writes `/users/{actualAuthUid}` documents;
+- sets every seeded service `providerId` to the actual provider UID;
+- writes ignored `seed-state.json` with the resolved UIDs (no passwords).
+
+Capture Firestore snapshots before and after each workflow:
+
+```powershell
+node verify.js C:\Users\MRSEANNYAKUTIRA\Desktop\Sangaso\app\reports\qa\evidence\before.json
+node verify.js C:\Users\MRSEANNYAKUTIRA\Desktop\Sangaso\app\reports\qa\evidence\after.json
+```
+
+## Run the Android app against the emulators
+
+Android emulator (`emulator-5554`) must reach the Windows host at `10.0.2.2`:
+
+```powershell
+flutter run -d emulator-5554 ^
+  --dart-define=SANGASO_USE_EMULATORS=true ^
+  --dart-define=SANGASO_EMULATOR_HOST=10.0.2.2
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:SANGASO_USE_EMULATORS='true'
+$env:SANGASO_EMULATOR_HOST='10.0.2.2'
+flutter run -d emulator-5554
+```
+
+Desktop and web keep `localhost` by default:
+
+```powershell
+flutter run -d windows --dart-define=SANGASO_USE_EMULATORS=true
+flutter run -d chrome --dart-define=SANGASO_USE_EMULATORS=true
+```
+
+`SANGASO_EMULATOR_HOST` (environment variable or `--dart-define`) overrides the
+default. It accepts a bare host or an `http://` URL. All emulator calls remain
+inside the explicit `SANGASO_USE_EMULATORS` branch; with the flag unset the app
+uses its normal Firebase configuration unchanged.
+
+## Rules safety
+
+`firestore.rules.emulator` and `storage.rules.emulator` are intentionally
+permissive, local-only files. They are untracked and ignored. The emulator runs
+with its built-in local allow-all behaviour because no rule paths are present in
+`firebase.json`. **Never deploy these files and never copy them into a
+deployable Firebase configuration.**

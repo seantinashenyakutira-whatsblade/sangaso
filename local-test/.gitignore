@@ -2,3 +2,12 @@ node_modules/
 package-lock.json
 *-debug.log
 *.log
+
+# Local-only fake credentials and derived UIDs. Never commit these.
+fake-credentials.local.json
+fake-credentials.*.json
+seed-state.json
+
+# Permissive rules are intentionally local-only and must never be deployed.
+*.rules.emulator
+*.rules.emulator.*
