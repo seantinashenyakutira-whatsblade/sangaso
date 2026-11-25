@@ -1,0 +1,227 @@
+{
+  "report": "Sangaso Android QA results — local emulator repair",
+  "generatedAt": "2026-11-25T15:45:00Z",
+  "branch": "fix/sangaso-full-repair-2026-11-22",
+  "device": {
+    "serial": "emulator-5554",
+    "avd": "Sangaso_Pixel6",
+    "apiLevel": 37,
+    "abi": "x86_64"
+  },
+  "localBackend": {
+    "project": "demo-sangaso-local",
+    "authEmulator": "127.0.0.1:9099",
+    "firestoreEmulator": "127.0.0.1:8080",
+    "storageEmulator": "NOT STARTED",
+    "productionContacted": false
+  },
+  "package": {
+    "name": "com.sangaso.app",
+    "versionName": "1.0.3",
+    "versionCode": 8,
+    "minSdk": 24,
+    "targetSdk": 36,
+    "qaApkSizeBytes": 155875228,
+    "qaApkSha256": "4A3A8AF80A78D5AB2FFDE484C5971E19B47A9C2B8B0F708BB448AD9A754647AD",
+    "qaApkDebugCertSha256": "e88de99206b1d2c1ef51b367ce575f71d52bc9d9b683f414af0415d47241e196"
+  },
+  "summary": {
+    "pass": 6,
+    "fail": 1,
+    "blocked": 7,
+    "notTested": 13
+  },
+  "tests": [
+    {
+      "id": "A-HISTORIC",
+      "name": "Empty-field validation (22 Nov, production-backed build)",
+      "status": "PASS"
+    },
+    {
+      "id": "B-HISTORIC",
+      "name": "Invalid password (22 Nov, production-backed build)",
+      "status": "PASS"
+    },
+    {
+      "id": "C-HISTORIC",
+      "name": "Correct credentials (22 Nov, production-backed build)",
+      "status": "FAIL",
+      "detail": "Firebase rejected the authorised account with invalid-credential. Not a local-emulator result and not a production booking test."
+    },
+    {
+      "id": "H-001",
+      "name": "Android emulator host fix (10.0.2.2) and override",
+      "status": "PASS",
+      "detail": "main.dart defaults Android to 10.0.2.2, desktop/web to localhost, supports SANGASO_EMULATOR_HOST override, and initializes demo-sangaso-local only in emulator mode."
+    },
+    {
+      "id": "H-002",
+      "name": "Auth Emulator seed and Firestore UID linkage",
+      "status": "PASS",
+      "detail": "Both accounts emailVerified; 2 user docs and 3 service docs verified; all providerId values match the seeded provider UID.",
+      "evidence": ["evidence/emulator-seed.utf8.log", "evidence/firestore-before-workflows.json"]
+    },
+    {
+      "id": "L-001",
+      "name": "Seeker login against local backend",
+      "status": "BLOCKED",
+      "reason": "APK installed, but emulator system_server/launcher/System UI ANRs prevented the app UI from becoming usable after repeated retries. No auth operation attempted.",
+      "evidence": ["evidence/local-launch1.png", "evidence/local-final-launch.png", "evidence/ui-launch1.xml", "evidence/ui-final-launch.xml"]
+    },
+    {
+      "id": "L-002",
+      "name": "Provider login against local backend",
+      "status": "BLOCKED",
+      "reason": "Same repeated emulator ANR blockage."
+    },
+    {
+      "id": "L-003",
+      "name": "Session persistence after restart",
+      "status": "NOT TESTED",
+      "reason": "Requires successful sign-in."
+    },
+    {
+      "id": "L-004",
+      "name": "Logout and relogin",
+      "status": "NOT TESTED",
+      "reason": "Requires successful sign-in."
+    },
+    {
+      "id": "L-005",
+      "name": "Marketplace",
+      "status": "NOT TESTED",
+      "reason": "App UI unavailable."
+    },
+    {
+      "id": "L-006",
+      "name": "Search and categories",
+      "status": "NOT TESTED",
+      "reason": "App UI unavailable."
+    },
+    {
+      "id": "L-007",
+      "name": "Provider profile",
+      "status": "NOT TESTED",
+      "reason": "App UI unavailable."
+    },
+    {
+      "id": "L-008",
+      "name": "Booking form",
+      "status": "NOT TESTED",
+      "reason": "App UI unavailable."
+    },
+    {
+      "id": "L-009",
+      "name": "Booking creation",
+      "status": "NOT TESTED",
+      "reason": "No booking created; Firestore snapshot remains baseline."
+    },
+    {
+      "id": "L-010",
+      "name": "Booking history",
+      "status": "NOT TESTED",
+      "reason": "No booking created."
+    },
+    {
+      "id": "L-011",
+      "name": "Booking details",
+      "status": "NOT TESTED",
+      "reason": "No booking created."
+    },
+    {
+      "id": "L-012",
+      "name": "Cancellation",
+      "status": "NOT TESTED",
+      "reason": "No booking created."
+    },
+    {
+      "id": "L-013",
+      "name": "Provider notification",
+      "status": "NOT TESTED",
+      "reason": "No booking created; no notification expected or observed."
+    },
+    {
+      "id": "L-014",
+      "name": "Provider-side booking visibility",
+      "status": "NOT TESTED",
+      "reason": "No booking created."
+    },
+    {
+      "id": "L-015",
+      "name": "Booking status consistency",
+      "status": "NOT TESTED",
+      "reason": "No booking created."
+    },
+    {
+      "id": "APK-001",
+      "name": "Owner-approved uninstall and repaired APK install",
+      "status": "PASS",
+      "evidence": ["evidence/apk-install-v2.log"]
+    },
+    {
+      "id": "CI-001",
+      "name": "Fork CI run 45637734491 test/build/upload",
+      "status": "PASS",
+      "detail": "Java 17, Flutter 3.38.5; flutter test and emulator-targeted debug APK passed. Analyze step failed on pre-existing lints."
+    },
+    {
+      "id": "CI-002",
+      "name": "Upstream build.yml Java 17 fix pushed/run",
+      "status": "BLOCKED",
+      "reason": "drizzlysean GitHub token lacks workflow scope; device authorization not completed in time."
+    },
+    {
+      "id": "REL-001",
+      "name": "Play Console versionCode 9 availability",
+      "status": "BLOCKED",
+      "reason": "Play Console not authenticated in browser."
+    },
+    {
+      "id": "REL-002",
+      "name": "Signing secrets/keystore/alias validation",
+      "status": "BLOCKED",
+      "reason": "Upstream GitHub scope pending; no keystore found locally."
+    },
+    {
+      "id": "REL-003",
+      "name": "Signed release AAB and Firebase SHA-1 check",
+      "status": "BLOCKED",
+      "reason": "No AAB built; no Play upload attempted; live Firebase unauthenticated."
+    },
+    {
+      "id": "LIVE-001",
+      "name": "Live Firebase rules/indexes/role-update check",
+      "status": "BLOCKED",
+      "reason": "firebase login:list reports no authorized accounts; owner browser authorization pending and the latest session 11B98 was not completed."
+    }
+  ],
+  "ci": {
+    "upstreamRunHistoric": {
+      "id": 45021288358,
+      "result": "FAILURE",
+      "cause": "Java 25 vs Gradle 8.14"
+    },
+    "forkRuns": [
+      {
+        "id": 45614107494,
+        "result": "Analyze FAILED (pre-existing lints); test/build/upload PASS",
+        "note": "First emulator-targeted APK; later superseded."
+      },
+      {
+        "id": 45637734491,
+        "result": "Analyze FAILED (pre-existing lints); test/build/upload PASS",
+        "note": "Corrected APK with demo-sangaso-local project id."
+      }
+    ]
+  },
+  "finalReadiness": "NOT READY — CRITICAL DEFECTS REMAIN",
+  "blockers": [
+    "Emulator system_server ANR under host starvation blocks interactive Android tests.",
+    "GitHub workflow-scope device authorization expired before owner approval.",
+    "Firebase CLI has no authorized account; live investigation blocked.",
+    "Play Console unauthenticated; versionCode 9 availability unknown.",
+    "Signing keystore/secrets validation and signed AAB build blocked.",
+    "No production booking tests were performed.",
+    "Firestore post-launch snapshot matches the seeded baseline; no bookings or notifications were created."
+  ]
+}
