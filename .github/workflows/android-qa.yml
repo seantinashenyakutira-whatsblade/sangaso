@@ -2,6 +2,17 @@
 
 on:
   workflow_dispatch:
+    inputs:
+      emulator_host:
+        description: 'Host compiled into the local-emulator QA APK'
+        required: false
+        default: '10.0.2.2'
+        type: string
+      artifact_name:
+        description: 'Artifact name for the built QA APK'
+        required: false
+        default: 'sangaso-emulator-debug-apk'
+        type: string
   push:
     branches:
       - ci/qa-fork-2026-11-22
@@ -38,15 +49,17 @@ jobs:
 
       - name: Build emulator-targeted debug APK
         if: always()
+        env:
+          SANGASO_EMULATOR_HOST: ${{ inputs.emulator_host || '10.0.2.2' }}
         run: |
           flutter build apk --debug \
             --dart-define=SANGASO_USE_EMULATORS=true \
-            --dart-define=SANGASO_EMULATOR_HOST=10.0.2.2
+            --dart-define=SANGASO_EMULATOR_HOST="$SANGASO_EMULATOR_HOST"
 
       - name: Upload emulator-targeted debug APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sangaso-emulator-debug-apk
+          name: ${{ inputs.artifact_name || 'sangaso-emulator-debug-apk' }}
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: warn
