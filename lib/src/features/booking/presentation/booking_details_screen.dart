@@ -54,7 +54,8 @@ class BookingDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final me = context.watch<AuthService>().currentUserModel;
     if (me == null) return const Scaffold(body: Center(child: Text('Not authenticated')));
-    final isProvider = me.role.name == 'provider';
+    // Role alone is not authority: each snapshot below verifies that the
+    // viewer is a participant on this specific booking.
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -72,6 +73,11 @@ class BookingDetailsScreen extends StatelessWidget {
           ]));
 
           final b = BookingModel.fromDoc(snap.data!);
+          final isParticipant = me.id == b.seekerId || me.id == b.providerId;
+          if (!isParticipant) {
+            return const Center(child: Text('You do not have access to this booking.'));
+          }
+          final isProvider = me.id == b.providerId;
           final col = _statusColor(b.status);
 
           return SingleChildScrollView(
@@ -190,7 +196,9 @@ class BookingDetailsScreen extends StatelessWidget {
         builder: (ctx, snap) {
           if (!snap.hasData || !snap.data!.exists) return const SizedBox.shrink();
           final b = BookingModel.fromDoc(snap.data!);
-          return _ActionBar(b: b, isProvider: isProvider);
+          final isParticipant = me.id == b.seekerId || me.id == b.providerId;
+          if (!isParticipant) return const SizedBox.shrink();
+          return _ActionBar(b: b, isProvider: me.id == b.providerId);
         },
       ),
     );

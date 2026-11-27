@@ -11,6 +11,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,9 +37,11 @@ jobs:
         with:
           name: sangaso-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
 
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,7 +64,16 @@ jobs:
           KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required signing secret: $name" >&2
+              exit 1
+            fi
+          done
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          keytool -list -keystore android/app/upload-keystore.jks \
+            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
           cat > android/key.properties <<EOF
           storePassword=$KEYSTORE_PASSWORD
           keyPassword=$KEY_PASSWORD
@@ -70,10 +82,17 @@ jobs:
           EOF
 
       - name: Build release AAB
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
+          set -euo pipefail
           flutter pub get
-          if [ -n "${{ inputs.build_number }}" ]; then
-            flutter build appbundle --release --build-number="${{ inputs.build_number }}"
+          if [ -n "$BUILD_NUMBER" ]; then
+            if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+              echo "build_number must be numeric" >&2
+              exit 1
+            fi
+            flutter build appbundle --release --build-number="$BUILD_NUMBER"
           else
             flutter build appbundle --release
           fi
@@ -83,3 +102,4 @@ jobs:
         with:
           name: sangaso-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

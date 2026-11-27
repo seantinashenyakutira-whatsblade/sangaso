@@ -1,4 +1,6 @@
 // lib/src/models/user_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'firestore_date.dart';
 
 enum UserRole { seeker, provider, admin }
@@ -67,8 +69,8 @@ class UserModel {
       'heardAbout': heardAbout,
       'isBanned': isBanned,
       'isSuspended': isSuspended,
-      'createdAt': createdAt?.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
+      'updatedAt': updatedAt == null ? null : Timestamp.fromDate(updatedAt!),
     };
   }
 

@@ -1,0 +1,16 @@
+{
+  "name": "sangaso-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node --test firestore.rules.test.js",
+    "test:emulator": "firebase emulators:exec --config ../firebase.rules-tests.json --project demo-sangaso-rules --only firestore \"npm test\""
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.34.0"
+  }
+}

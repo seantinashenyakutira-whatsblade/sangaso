@@ -227,6 +227,17 @@ class _AddEditServiceScreenState extends State<AddEditServiceScreen> {
     final user = authService.currentUserModel;
     if (user == null) return;
 
+    // Ownership is immutable. Loading an arbitrary service id must never
+    // reassign it to the current provider.
+    if (widget.serviceId != null && _existingService?.providerId != user.id) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only edit your own services.')),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {

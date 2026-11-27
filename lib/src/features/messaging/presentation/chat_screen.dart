@@ -29,6 +29,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   String? _otherUserName;
   bool _isProvider = false;
+  bool? _hasAccess;
   Timer? _typingTimer;
   bool _isTyping = false;
   bool _showScrollToBottom = false;
@@ -73,15 +74,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (bookingDoc.exists) {
         final booking = BookingModel.fromDoc(bookingDoc);
+        final isParticipant =
+            user.id == booking.seekerId || user.id == booking.providerId;
 
         setState(() {
+          _hasAccess = isParticipant;
           _isProvider = user.id == booking.providerId;
           _otherUserName = _isProvider
               ? booking.seekerName ?? 'Customer'
               : booking.providerName ?? 'Provider';
         });
+      } else {
+        setState(() => _hasAccess = false);
       }
     } catch (e) {
+      setState(() => _hasAccess = false);
     }
   }
 
@@ -356,6 +363,15 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         ),
+      );
+    }
+    if (_hasAccess == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_hasAccess == false) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chat')),
+        body: const Center(child: Text('You do not have access to this conversation.')),
       );
     }
 

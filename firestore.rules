@@ -1,0 +1,477 @@
+rules_version = '2';
+
+// ===============================================================
+// Sangaso Firestore Security Rules — PROTOTYPE, NOT DEPLOYED
+// ===============================================================
+// Assumed data model
+// ---------------------------------------------------------------
+// users/{uid}
+//   id, email, role ('seeker'|'provider'|'admin'), isVerified,
+//   isBanned, isSuspended, kycApproved (admin-only), displayName,
+//   photoUrl, phoneNumber, city, address, tradingName, category,
+//   bio, basePrice, heardAbout, createdAt, updatedAt, consent,
+//   fcmTokens. Contains PII -> readable only by self/admin.
+//
+// publicProfiles/{uid}
+//   Non-PII projection: displayName, tradingName, category, city,
+//   photoUrl, basePrice, role, kycApproved, updatedAt. Explicitly public.
+//   Written only by trusted backend (Admin SDK), never by clients.
+//
+// services/{serviceId}
+//   id, providerId, name, description, category, price, imageUrls,
+//   isActive, createdAt, updatedAt. Listing data; public when active.
+//
+// bookings/{bookingId}
+//   id, seekerId, providerId, serviceId, serviceType, serviceName,
+//   scheduledTime, address, price, status, seekerName, seekerPhone,
+//   seekerEmail, providerName, providerPhone, providerEmail,
+//   specialInstructions, notes, createdAt, updatedAt, acceptedAt,
+//   startedAt, completedAt. Participant-only.
+//
+// bookings/{bookingId}/messages/{messageId}
+//   bookingId, senderId, receiverId, text, timestamp, isRead.
+//   Participant-only.
+//
+// notifications/{notificationId}
+//   id, userId, title, message/body, type, relatedId, isRead, createdAt.
+//   Recipient-only. Create/delete backend-only.
+//
+// reviews/{reviewId}
+//   id == bookingId + '_' + seekerUid, bookingId, serviceId, providerId,
+//   seekerId, seekerName, rating (int 1..5), comment, createdAt.
+//
+// stats/{docId}
+//   Precomputed public counts. Written by trusted backend/admin only.
+//
+// Admin authority comes from the Firebase Auth custom claim `admin`, never
+// from the user document. KYC/ban/suspension are admin-controlled fields.
+// ===============================================================
+
+// ===============================================================
+// Helpers
+// ===============================================================
+function isAuthenticated() {
+  return request.auth != null;
+}
+
+function hasTrueClaim(claim) {
+  // Explicit existence checks avoid evaluation errors for users without the
+  // optional claim; the result is simply false.
+  return isAuthenticated() && claim in request.auth.token && request.auth.token[claim] == true;
+}
+
+function isAdmin() {
+  return hasTrueClaim('admin');
+}
+
+function isEmailVerified() {
+  return hasTrueClaim('email_verified');
+}
+
+function isSelf(uid) {
+  return isAuthenticated() && request.auth.uid == uid;
+}
+
+function userPath(uid) {
+  return /databases/$(database)/documents/users/$(uid);
+}
+
+function servicePath(id) {
+  return /databases/$(database)/documents/services/$(id);
+}
+
+function bookingPath(id) {
+  return /databases/$(database)/documents/bookings/$(id);
+}
+
+function hasAll(data, keys) {
+  return data.keys().hasAll(keys);
+}
+
+function hasOnly(data, keys) {
+  return data.keys().hasOnly(keys);
+}
+
+function isBoundedString(value, maxLen) {
+  return value is string && value.size() <= maxLen;
+}
+
+function isOptionalBoundedString(data, field, maxLen) {
+  return !(field in data) || data[field] == null || isBoundedString(data[field], maxLen);
+}
+
+function isOptionalTimestamp(data, field) {
+  return !(field in data) || data[field] == null || data[field] is timestamp;
+}
+
+function isBoundedUrlList(value, maxCount, maxLen) {
+  return value is list
+    && value.size() <= maxCount
+    && value.all(url, url is string
+      && url.size() <= maxLen
+      && (url.matches('^https://.*') || url == ''));
+}
+
+// Email syntax is already enforced by Firebase Auth. Rules only bound the
+// stored value and compare it to the authenticated token or existing document.
+function isValidEmail(value) {
+  return value is string && value.size() <= 254;
+}
+
+function isValidConsent(value) {
+  return value == null || (value is map
+    && value.keys().hasOnly(['acceptedAt', 'terms', 'privacy'])
+    && isOptionalTimestamp(value, 'acceptedAt')
+    && (!('terms' in value) || value.terms is bool)
+    && (!('privacy' in value) || value.privacy is bool));
+}
+
+function isValidFcmTokens(value) {
+  return value == null || (value is map
+    && value.size() <= 20
+    && value.keys().all(k, k is string && k.size() <= 512)
+    && value.values().all(v, v is string && v.size() <= 512));
+}
+
+// ===============================================================
+// Domain validators — called on BOTH create and update
+// ===============================================================
+function isValidUserData(data) {
+  return hasAll(data, ['id', 'email', 'role', 'isVerified', 'isBanned', 'isSuspended'])
+    && hasOnly(data, [
+      'id', 'email', 'role', 'isVerified', 'displayName', 'photoUrl',
+      'phoneNumber', 'city', 'address', 'tradingName', 'category', 'bio',
+      'basePrice', 'heardAbout', 'isBanned', 'isSuspended', 'kycApproved',
+      'createdAt', 'updatedAt', 'consent', 'fcmTokens'
+    ])
+    && isBoundedString(data.id, 128)
+    && isValidEmail(data.email)
+    && data.role in ['seeker', 'provider', 'admin']
+    && data.isVerified is bool
+    && data.isBanned is bool
+    && data.isSuspended is bool
+    && (!('kycApproved' in data) || data.kycApproved is bool)
+    && isOptionalBoundedString(data, 'displayName', 120)
+    && isOptionalBoundedString(data, 'photoUrl', 500)
+    && isOptionalBoundedString(data, 'phoneNumber', 40)
+    && isOptionalBoundedString(data, 'city', 120)
+    && isOptionalBoundedString(data, 'address', 300)
+    && isOptionalBoundedString(data, 'tradingName', 120)
+    && isOptionalBoundedString(data, 'category', 80)
+    && isOptionalBoundedString(data, 'bio', 1000)
+    && isOptionalBoundedString(data, 'heardAbout', 300)
+    && (!('basePrice' in data) || data.basePrice == null || (data.basePrice is number && data.basePrice >= 0 && data.basePrice <= 1000000))
+    && isOptionalTimestamp(data, 'createdAt')
+    && isOptionalTimestamp(data, 'updatedAt')
+    && (!('consent' in data) || isValidConsent(data.consent))
+    && (!('fcmTokens' in data) || isValidFcmTokens(data.fcmTokens));
+}
+
+function isValidServiceData(data) {
+  return hasAll(data, ['id', 'providerId', 'name', 'category', 'price', 'isActive', 'createdAt', 'updatedAt'])
+    && hasOnly(data, [
+      'id', 'providerId', 'name', 'description', 'category', 'price',
+      'imageUrls', 'isActive', 'createdAt', 'updatedAt'
+    ])
+    && isBoundedString(data.id, 128)
+    && isBoundedString(data.providerId, 128)
+    && isBoundedString(data.name, 160)
+    && isOptionalBoundedString(data, 'description', 4000)
+    && isBoundedString(data.category, 80)
+    && data.price is number && data.price >= 0 && data.price <= 1000000
+    && (!('imageUrls' in data) || isBoundedUrlList(data.imageUrls, 20, 500))
+    && data.isActive is bool
+    && data.createdAt is timestamp
+    && data.updatedAt is timestamp;
+}
+
+function isValidBookingData(data) {
+  return hasAll(data, [
+    'id', 'seekerId', 'providerId', 'serviceType', 'scheduledTime',
+    'address', 'price', 'status', 'createdAt'
+  ])
+    && hasOnly(data, [
+      'id', 'seekerId', 'providerId', 'serviceId', 'serviceType',
+      'serviceName', 'scheduledTime', 'address', 'price', 'status',
+      'seekerName', 'seekerPhone', 'seekerEmail', 'providerName',
+      'providerPhone', 'providerEmail', 'specialInstructions', 'notes',
+      'createdAt', 'updatedAt', 'acceptedAt', 'startedAt', 'completedAt'
+    ])
+    && isBoundedString(data.id, 128)
+    && isBoundedString(data.seekerId, 128)
+    && isBoundedString(data.providerId, 128)
+    && isOptionalBoundedString(data, 'serviceId', 128)
+    && isBoundedString(data.serviceType, 160)
+    && isOptionalBoundedString(data, 'serviceName', 160)
+    && isBoundedString(data.address, 300)
+    && isOptionalBoundedString(data, 'specialInstructions', 1000)
+    && isOptionalBoundedString(data, 'notes', 1000)
+    && isOptionalBoundedString(data, 'seekerName', 120)
+    && isOptionalBoundedString(data, 'providerName', 120)
+    && isOptionalBoundedString(data, 'seekerPhone', 40)
+    && isOptionalBoundedString(data, 'providerPhone', 40)
+    && (!('seekerEmail' in data) || isValidEmail(data.seekerEmail))
+    && (!('providerEmail' in data) || isValidEmail(data.providerEmail))
+    && data.price is number && data.price >= 0 && data.price <= 1000000
+    && data.scheduledTime is timestamp && data.scheduledTime > request.time
+    && data.status in ['requested', 'accepted', 'declined', 'inProgress', 'completed', 'cancelled']
+    && data.createdAt is timestamp
+    && isOptionalTimestamp(data, 'updatedAt')
+    && isOptionalTimestamp(data, 'acceptedAt')
+    && isOptionalTimestamp(data, 'startedAt')
+    && isOptionalTimestamp(data, 'completedAt');
+}
+
+function isValidMessageData(data) {
+  return hasAll(data, ['bookingId', 'senderId', 'receiverId', 'text', 'timestamp', 'isRead'])
+    && hasOnly(data, ['bookingId', 'senderId', 'receiverId', 'text', 'timestamp', 'isRead'])
+    && isBoundedString(data.bookingId, 128)
+    && isBoundedString(data.senderId, 128)
+    && isBoundedString(data.receiverId, 128)
+    && isBoundedString(data.text, 2000)
+    && data.timestamp is timestamp
+    && data.isRead is bool;
+}
+
+function isValidNotificationData(data) {
+  return hasAll(data, ['userId', 'title', 'createdAt'])
+    && hasOnly(data, ['id', 'userId', 'title', 'message', 'body', 'type', 'relatedId', 'isRead', 'createdAt'])
+    && isBoundedString(data.userId, 128)
+    && isBoundedString(data.title, 160)
+    && isOptionalBoundedString(data, 'message', 1000)
+    && isOptionalBoundedString(data, 'body', 1000)
+    && isOptionalBoundedString(data, 'type', 80)
+    && isOptionalBoundedString(data, 'relatedId', 128)
+    && (!('isRead' in data) || data.isRead is bool)
+    && data.createdAt is timestamp;
+}
+
+function isValidReviewData(data) {
+  return hasAll(data, ['bookingId', 'providerId', 'seekerId', 'rating', 'createdAt'])
+    && hasOnly(data, ['id', 'bookingId', 'serviceId', 'providerId', 'seekerId', 'seekerName', 'rating', 'comment', 'createdAt'])
+    && isBoundedString(data.bookingId, 128)
+    && isBoundedString(data.providerId, 128)
+    && isBoundedString(data.seekerId, 128)
+    && isOptionalBoundedString(data, 'serviceId', 128)
+    && isOptionalBoundedString(data, 'seekerName', 120)
+    && data.rating is int && data.rating >= 1 && data.rating <= 5
+    && isOptionalBoundedString(data, 'comment', 2000)
+    && data.createdAt is timestamp;
+}
+
+// ===============================================================
+// Rules
+// ===============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      allow create: if isAuthenticated()
+        && isSelf(userId)
+        && isValidUserData(request.resource.data)
+        && request.resource.data.id == userId
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role in ['seeker', 'provider']
+        && request.resource.data.isVerified == isEmailVerified()
+        && request.resource.data.isBanned == false
+        && request.resource.data.isSuspended == false
+        && (!('kycApproved' in request.resource.data) || request.resource.data.kycApproved == false);
+
+      allow update: if isAuthenticated()
+        && isValidUserData(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.email == resource.data.email
+        && (
+          (
+            // Self-service updates: authority fields are immutable. Email
+            // verification may mirror the Auth token, never KYC/admin flags.
+            isSelf(userId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'isVerified', 'displayName', 'photoUrl', 'phoneNumber', 'city',
+              'address', 'tradingName', 'category', 'bio', 'basePrice',
+              'heardAbout', 'updatedAt', 'fcmTokens'
+            ])
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerified'])
+              || (isEmailVerified() && request.resource.data.isVerified == true)
+            )
+          )
+          || (
+            // Admin claim holders may moderate, but never change a user's
+            // email or document id.
+            isAdmin()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'role', 'isVerified', 'isBanned', 'isSuspended', 'kycApproved',
+              'displayName', 'photoUrl', 'phoneNumber', 'city', 'address',
+              'tradingName', 'category', 'bio', 'basePrice', 'heardAbout',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /publicProfiles/{userId} {
+      // Explicitly public, non-PII projection maintained by the backend.
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if resource.data.isActive == true
+        || (isAuthenticated() && resource.data.providerId == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isAuthenticated()
+        && isValidServiceData(request.resource.data)
+        && request.resource.data.id == serviceId
+        && request.resource.data.providerId == request.auth.uid
+        && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.role in ['provider', 'admin'];
+
+      allow update: if isValidServiceData(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.providerId == resource.data.providerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'description', 'category', 'price', 'imageUrls', 'isActive', 'updatedAt'
+        ])
+        && (isAdmin() || (isAuthenticated() && resource.data.providerId == request.auth.uid));
+
+      allow delete: if isAdmin()
+        || (isAuthenticated() && resource.data.providerId == request.auth.uid);
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAdmin()
+        || (isAuthenticated()
+          && request.auth.uid in [resource.data.seekerId, resource.data.providerId]);
+
+      allow create: if isAuthenticated()
+        && isValidBookingData(request.resource.data)
+        && request.resource.data.id == bookingId
+        && request.resource.data.seekerId == request.auth.uid
+        && request.resource.data.status == 'requested'
+        && exists(userPath(request.resource.data.seekerId))
+        && exists(userPath(request.resource.data.providerId))
+        && get(userPath(request.resource.data.providerId)).data.role in ['provider', 'admin']
+        && (!('serviceId' in request.resource.data)
+          || request.resource.data.serviceId == null
+          || !exists(servicePath(request.resource.data.serviceId))
+          || get(servicePath(request.resource.data.serviceId)).data.providerId == request.resource.data.providerId)
+        && (!('seekerEmail' in request.resource.data)
+          || request.resource.data.seekerEmail == get(userPath(request.auth.uid)).data.email)
+        && (!('providerEmail' in request.resource.data)
+          || request.resource.data.providerEmail == get(userPath(request.resource.data.providerId)).data.email);
+
+      allow update: if isAuthenticated()
+        && isValidBookingData(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.seekerId == resource.data.seekerId
+        && request.resource.data.providerId == resource.data.providerId
+        && (('serviceId' in request.resource.data) == ('serviceId' in resource.data))
+        && (!('serviceId' in request.resource.data)
+          || request.resource.data.serviceId == resource.data.serviceId)
+        && request.resource.data.scheduledTime == resource.data.scheduledTime
+        && request.resource.data.address == resource.data.address
+        && request.resource.data.price == resource.data.price
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'updatedAt', 'acceptedAt', 'startedAt', 'completedAt'
+        ])
+        && (
+          // Seeker may cancel only before work starts.
+          (request.auth.uid == resource.data.seekerId
+            && resource.data.status == 'requested'
+            && request.resource.data.status == 'cancelled')
+          ||
+          // Provider participants own the active lifecycle.
+          (request.auth.uid == resource.data.providerId && (
+            (resource.data.status == 'requested' && request.resource.data.status in ['accepted', 'declined'])
+            || (resource.data.status == 'accepted' && request.resource.data.status == 'inProgress')
+            || (resource.data.status == 'inProgress' && request.resource.data.status == 'completed')
+          ))
+          || isAdmin()
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['acceptedAt'])
+          || (request.resource.data.status == 'accepted' && request.resource.data.acceptedAt is timestamp)
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['startedAt'])
+          || (request.resource.data.status == 'inProgress' && request.resource.data.startedAt is timestamp)
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['completedAt'])
+          || (request.resource.data.status == 'completed' && request.resource.data.completedAt is timestamp)
+        );
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function parentBooking() {
+          return get(bookingPath(bookingId)).data;
+        }
+
+        function isParticipant() {
+          return isAuthenticated()
+            && request.auth.uid in [parentBooking().seekerId, parentBooking().providerId];
+        }
+
+        allow read: if isAdmin() || isParticipant();
+
+        allow create: if isAuthenticated()
+          && isValidMessageData(request.resource.data)
+          && request.resource.data.bookingId == bookingId
+          && request.resource.data.senderId == request.auth.uid
+          && isParticipant();
+
+        allow update: if isAuthenticated()
+          && isParticipant()
+          && request.auth.uid != resource.data.senderId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
+          && request.resource.data.isRead == true;
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAdmin()
+        || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // Client create/delete is denied. Trusted backend creates notifications.
+      allow create, delete: if false;
+
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
+        && request.resource.data.isRead is bool;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated() || isAdmin();
+
+      allow create: if isAuthenticated()
+        && isValidReviewData(request.resource.data)
+        && request.resource.data.id == reviewId
+        && reviewId == request.resource.data.bookingId + '_' + request.auth.uid
+        && request.resource.data.seekerId == request.auth.uid
+        && exists(bookingPath(request.resource.data.bookingId))
+        && get(bookingPath(request.resource.data.bookingId)).data.seekerId == request.auth.uid
+        && get(bookingPath(request.resource.data.bookingId)).data.status == 'completed'
+        && get(bookingPath(request.resource.data.bookingId)).data.providerId == request.resource.data.providerId;
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /stats/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

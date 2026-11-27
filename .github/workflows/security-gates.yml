@@ -1,0 +1,48 @@
+name: Security gates
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'fix/**'
+  pull_request:
+
+jobs:
+  backend-and-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            functions/package-lock.json
+            rules-tests/package-lock.json
+
+      - name: Set up JDK for Firebase emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build trusted backend source
+        working-directory: functions
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+
+      - name: Run Firestore rules red-team tests
+        working-directory: rules-tests
+        env:
+          FIRESTORE_EMULATOR_PORT: '8088'
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run test:emulator

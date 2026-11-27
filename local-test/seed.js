@@ -54,7 +54,7 @@ const auth = getAuth();
 const str = (value) => ({ stringValue: value });
 const bool = (value) => ({ booleanValue: value });
 const int = (value) => ({ integerValue: String(value) });
-const ts = (iso) => ({ stringValue: iso });
+const ts = (iso) => ({ timestampValue: iso });
 
 const docPath = (collection, id) =>
   `v1/projects/${PROJECT}/databases/(default)/documents/${collection}/${encodeURIComponent(id)}`;
@@ -135,6 +135,7 @@ async function verifyPasswordSignIn(user) {
     `${authBase}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`,
     {
       method: 'POST',
+      redirect: 'error',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: user.email,
@@ -155,6 +156,7 @@ async function verifyPasswordSignIn(user) {
 async function patchDocument(collection, id, fields) {
   const response = await fetch(`${firestoreBase}/${docPath(collection, id)}`, {
     method: 'PATCH',
+    redirect: 'error',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields }),
   });
@@ -165,7 +167,10 @@ async function patchDocument(collection, id, fields) {
 }
 
 async function listDocuments(collection) {
-  const response = await fetch(`${firestoreBase}/${collectionPath(collection)}?pageSize=100`);
+  const response = await fetch(
+    `${firestoreBase}/${collectionPath(collection)}?pageSize=100`,
+    { redirect: 'error' },
+  );
   if (!response.ok) {
     throw new Error(`list ${collection}: ${response.status} ${await response.text()}`);
   }

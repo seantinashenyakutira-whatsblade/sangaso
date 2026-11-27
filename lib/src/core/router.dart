@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/admin/presentation/admin_dashboard_screen.dart';
@@ -51,6 +52,10 @@ if (user == null) {
       return '/verify-email';
     }
 
+    if (user.isBanned || user.isSuspended) {
+      return path == '/access-denied' ? null : '/access-denied';
+    }
+
     // Onboarding guard: verified users with incomplete profiles are routed
     // to profile setup once. Completed profiles pass straight through, so
     // returning users are never forced to redo onboarding. Guarding the
@@ -60,6 +65,12 @@ if (user == null) {
     final city = user.city ?? '';
     if ((displayName.isEmpty || city.isEmpty) && !isProfileSetup) {
       return '/profile-setup';
+    }
+
+    // Admin routes require an admin-role user; the backend claim is enforced
+    // by Firestore rules, this guard prevents ordinary users from opening it.
+    if (path.startsWith('/admin') && user.role != UserRole.admin) {
+      return '/home';
     }
 
     if (isAuthPath || isSplash || isVerifying) {
@@ -77,6 +88,21 @@ if (user == null) {
       GoRoute(path: '/verify-email', builder: (context, state) => const VerifyEmailScreen()),
       GoRoute(path: '/profile-setup', builder: (context, state) => const ProfileSetupScreen()),
       GoRoute(path: '/admin', builder: (context, state) => const AdminDashboardScreen()),
+      GoRoute(
+        path: '/access-denied',
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(title: const Text('Account unavailable')),
+          body: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'This account is banned or suspended. Contact Sangaso support for assistance.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
 
       // Shell with bottom navigation
       ShellRoute(

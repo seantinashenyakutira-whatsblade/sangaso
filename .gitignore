@@ -83,3 +83,13 @@ migrate_working_dir/
 ~$*
 
 diagnostics/
+
+# Node tooling (rules tests and trusted backend)
+**/node_modules/
+/functions/lib/
+/.firebase/
+/rules-tests/coverage/
+
+# Emulator-only rule variants must never be deployed
+firestore.rules.emulator
+storage.rules.emulator

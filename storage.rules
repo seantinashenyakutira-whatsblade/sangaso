@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// ===============================================================
+// Sangaso Cloud Storage rules — prototype
+// ===============================================================
+// Public reads are intentional only for files that contain no private data:
+//   - profile_pictures/**  (avatar images)
+//   - service_images/**    (marketplace listing images)
+// All writes require the signed-in user to own the path prefix. Content type
+// and size are bounded to prevent abuse. No secret values are stored here.
+// ===============================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+
+    function fileNameStartsWithUid(uid) {
+      return request.resource.name.matches('^' + uid + '_[A-Za-z0-9._-]+$');
+    }
+
+    function isAllowedImage() {
+      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp']
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    match /profile_pictures/{fileName} {
+      allow read: if true;
+      allow create, update: if isAuthenticated()
+        && (fileNameStartsWithUid(request.auth.uid) || isAdmin())
+        && isAllowedImage();
+      allow delete: if isAuthenticated()
+        && (fileNameStartsWithUid(request.auth.uid) || isAdmin());
+    }
+
+    match /service_images/{fileName} {
+      allow read: if true;
+      allow create, update: if isAuthenticated()
+        && (fileNameStartsWithUid(request.auth.uid) || isAdmin())
+        && isAllowedImage();
+      allow delete: if isAuthenticated()
+        && (fileNameStartsWithUid(request.auth.uid) || isAdmin());
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

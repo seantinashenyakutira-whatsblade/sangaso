@@ -229,6 +229,8 @@ class FirebaseAuthService extends AuthService {
         photoUrl: cred.user?.photoURL,
         isBanned: false,
         isSuspended: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       await _firestore.collection('users').doc(uid).set(userModel.toMap());
       // Record that this new account accepted the Terms and Privacy Notice.
@@ -282,6 +284,8 @@ class FirebaseAuthService extends AuthService {
         photoUrl: null,
         isBanned: false,
         isSuspended: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
       final userMap = userModel.toMap();
