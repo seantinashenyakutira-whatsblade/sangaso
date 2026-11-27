@@ -101,14 +101,23 @@ void main() async {
     // Host resolution is intentionally scoped to the opt-in branch. With the
     // flag unset the app continues to use the normal Firebase configuration.
     final host = emulatorHost;
-    await FirebaseAuth.instance.useAuthEmulator(host, _kAuthEmulatorPort);
+    // The host is explicit (AVD 10.0.2.2 or physical-device USB reverse
+    // 127.0.0.1). Disable FlutterFire's Android-only loopback remapping so a
+    // physical device does not silently redirect 127.0.0.1 to 10.0.2.2.
+    await FirebaseAuth.instance.useAuthEmulator(
+      host,
+      _kAuthEmulatorPort,
+      automaticHostMapping: false,
+    );
     FirebaseFirestore.instance.useFirestoreEmulator(
       host,
       _kFirestoreEmulatorPort,
+      automaticHostMapping: false,
     );
     FirebaseStorage.instance.useStorageEmulator(
       host,
       _kStorageEmulatorPort,
+      automaticHostMapping: false,
     );
   }
 
