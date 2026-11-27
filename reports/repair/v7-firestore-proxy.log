@@ -1,0 +1,5 @@
+2026-11-27T16:28:44.905Z proxy starting listen=8087 target=127.0.0.1:8080
+2026-11-27T16:28:44.937Z proxy listening
+2026-11-27T16:29:31.603Z client connected
+2026-11-27T16:29:31.609Z upstream connected
+2026-11-27T16:29:31.627Z request method=PRI path=*

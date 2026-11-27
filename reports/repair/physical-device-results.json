@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-27",
+  "project": "demo-sangaso-local",
+  "branch": "fix/sangaso-full-repair-2026-11-22",
+  "device": {
+    "manufacturer": "HONOR",
+    "model": "WDY-LX2",
+    "device": "HNWDY-M",
+    "android": "14",
+    "sdk": 34,
+    "wifiSerial": "adb-A4SFCP3B17401242-f6P7kg._adb-tls-connect._tcp",
+    "currentlyDiscovered": false
+  },
+  "overallReadiness": "NOT_READY",
+  "checks": [
+    {
+      "name": "wifi_adb_connection",
+      "status": "BLOCKED",
+      "detail": "Device was online earlier; currently absent from adb devices and adb mdns services."
+    },
+    {
+      "name": "reverse_forwarding",
+      "status": "PASS",
+      "detail": "tcp:9099 and tcp:8080 direct mappings restored after each proxy run; device curl returned HTTP 200."
+    },
+    {
+      "name": "local_emulators",
+      "status": "PASS",
+      "detail": "Auth 9099, Firestore 8080, UI 4000/4400 listening; seed verification passed with 2 users and 3 services."
+    },
+    {
+      "name": "ci_apk_emulator_targeting",
+      "status": "FAIL",
+      "detail": "Original CI APK produced unknown auth error with zero local proxy connections."
+    },
+    {
+      "name": "local_rebuild_explicit_defines",
+      "status": "PASS",
+      "detail": "APK SHA-256 C53004C6C4A62E0A5513E41EC608486F39080A26CB8C407AE3E88041FDCDB64F; emulator define values present in kernel_blob.bin."
+    },
+    {
+      "name": "debug_cleartext_fix",
+      "status": "PASS",
+      "detail": "Debug-only network security config permits cleartext only for localhost, 127.0.0.1, and 10.0.2.2."
+    },
+    {
+      "name": "auth_emulator_reached_from_app",
+      "status": "PASS",
+      "detail": "Proxy logged verifyPassword POST at 2026-11-27T16:29:28.623Z with fake emulator API key."
+    },
+    {
+      "name": "firestore_emulator_reached_from_app",
+      "status": "PASS",
+      "detail": "Proxy logged HTTP/2 PRI preface at 2026-11-27T16:29:31.603Z."
+    },
+    {
+      "name": "seeker_signin_final_ui",
+      "status": "BLOCKED",
+      "detail": "App left foreground after sign-in; explicit relaunch showed blank Flutter view; device disconnected before final confirmation."
+    },
+    {
+      "name": "firestore_state_after_signin",
+      "status": "PASS",
+      "detail": "Baseline and after snapshots match on users, services, bookings, and notifications; only capturedAt differs."
+    },
+    {
+      "name": "booking_workflows",
+      "status": "NOT_TESTED",
+      "detail": "Held pending confirmed signed-in UI state."
+    },
+    {
+      "name": "provider_signin",
+      "status": "NOT_TESTED",
+      "detail": "Held pending seeker flow completion."
+    },
+    {
+      "name": "upstream_workflow_and_live_firebase",
+      "status": "BLOCKED",
+      "detail": "GitHub workflow scope and Firebase login approvals outstanding."
+    },
+    {
+      "name": "play_console_and_signed_aab",
+      "status": "BLOCKED",
+      "detail": "Play Console unauthenticated; versionCode 9 availability and signing assets unconfirmed."
+    }
+  ],
+  "productionActionsPerformed": {
+    "firebaseWrite": false,
+    "websiteDeploy": false,
+    "playUpload": false,
+    "productionBookingTest": false
+  }
+}

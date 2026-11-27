@@ -1,0 +1,85 @@
+{
+  "project": "demo-sangaso-local",
+  "capturedAt": "2026-11-27T16:29:49.361Z",
+  "seekerUid": "OxThzshuSGjlM6zMZFblXSrPZScS",
+  "providerUid": "6IR3bIgxz7l7spGkOYWsG7RLUI4k",
+  "seeker": {
+    "id": "OxThzshuSGjlM6zMZFblXSrPZScS",
+    "email": "seeker@demo-sangaso-local.test",
+    "role": "seeker",
+    "isVerified": true,
+    "displayName": "Demo Seeker",
+    "phoneNumber": "+15550000001",
+    "city": "Local Test City",
+    "address": "1 Seeker Lane",
+    "isBanned": false,
+    "isSuspended": false,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  "provider": {
+    "id": "6IR3bIgxz7l7spGkOYWsG7RLUI4k",
+    "email": "provider@demo-sangaso-local.test",
+    "role": "provider",
+    "isVerified": true,
+    "displayName": "Demo Provider",
+    "phoneNumber": "+15550000002",
+    "city": "Local Test City",
+    "address": "2 Provider Lane",
+    "isBanned": false,
+    "isSuspended": false,
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z",
+    "tradingName": "Sangaso Demo Provider",
+    "category": "Cleaning",
+    "bio": "Local emulator provider for end-to-end QA.",
+    "basePrice": 250,
+    "heardAbout": "local-test seed"
+  },
+  "services": [
+    {
+      "id": "svc-clean-001",
+      "providerId": "6IR3bIgxz7l7spGkOYWsG7RLUI4k",
+      "name": "Deep apartment clean",
+      "description": "Full apartment clean with supplies",
+      "category": "Cleaning",
+      "price": 250,
+      "imageUrls": [],
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "svc-elec-001",
+      "providerId": "6IR3bIgxz7l7spGkOYWsG7RLUI4k",
+      "name": "Ceiling fan installation",
+      "description": "Ceiling fan install small job",
+      "category": "Electrical",
+      "price": 150,
+      "imageUrls": [],
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "svc-plumb-001",
+      "providerId": "6IR3bIgxz7l7spGkOYWsG7RLUI4k",
+      "name": "Bathroom plumbing repair",
+      "description": "Leaking taps and pipes",
+      "category": "Plumbing",
+      "price": 180,
+      "imageUrls": [],
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "bookings": [],
+  "notifications": [],
+  "counts": {
+    "users": 2,
+    "services": 3,
+    "relatedBookings": 0,
+    "relatedNotifications": 0
+  }
+}

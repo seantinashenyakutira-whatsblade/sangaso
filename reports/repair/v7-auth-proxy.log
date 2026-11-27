@@ -1,0 +1,7 @@
+2026-11-27T16:28:44.843Z proxy starting listen=9097 target=127.0.0.1:9099
+2026-11-27T16:28:44.880Z proxy listening
+2026-11-27T16:29:28.623Z client connected
+2026-11-27T16:29:28.673Z request method=POST path=/www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=fake-api-key-for-local-emulators
+2026-11-27T16:29:28.675Z upstream connected
+2026-11-27T16:29:35.620Z upstream closed
+2026-11-27T16:29:35.621Z client closed after 6998ms
