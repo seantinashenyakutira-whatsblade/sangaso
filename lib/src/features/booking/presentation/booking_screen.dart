@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../models/service_model.dart';
-import '../../../models/user_model.dart';
+import '../../../models/public_profile_model.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/booking_service.dart';
 import '../../../services/service_service.dart';
@@ -30,7 +30,7 @@ class _BookingScreenState extends State<BookingScreen> {
   TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
   final _addressController = TextEditingController();
   bool _isLoading = false;
-  UserModel? _provider;
+  PublicProfileModel? _provider;
   ServiceModel? _service;
 
   // Sangaso brand palette (shared design tokens)
@@ -52,12 +52,12 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Future<void> _loadProvider() async {
     final doc = await FirebaseFirestore.instance
-        .collection('users')
+        .collection('publicProfiles')
         .doc(widget.providerId)
         .get();
     if (doc.exists && mounted) {
       setState(() {
-        _provider = UserModel.fromMap(doc.data()!);
+        _provider = PublicProfileModel.fromDoc(doc);
       });
     }
     // Load the origin service so the booking carries the tapped

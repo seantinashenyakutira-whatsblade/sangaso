@@ -144,6 +144,7 @@ export const syncPublicProfile = onDocumentWritten('users/{uid}', async (event) 
       city: data.city ?? null,
       photoUrl: data.photoUrl ?? null,
       basePrice: data.basePrice ?? null,
+      bio: data.bio ?? null,
       kycApproved: data.kycApproved === true,
       isBanned: data.isBanned === true,
       isSuspended: data.isSuspended === true,
@@ -249,7 +250,7 @@ export const onMessageCreated = onDocumentCreated(
         userId: message.receiverId,
         title: 'New Message',
         message: message.text.slice(0, 300),
-        type: 'message',
+        type: 'newMessage',
         relatedId: event.params.bookingId,
       }),
     );

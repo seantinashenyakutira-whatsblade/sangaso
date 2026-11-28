@@ -2,9 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sangaso/src/models/booking_model.dart';
-import 'package:sangaso/src/models/notification_model.dart';
 import 'package:sangaso/src/services/booking_service.dart';
-import 'package:sangaso/src/services/notification_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,27 +12,31 @@ void main() {
   setUp(() async {
     firestore = FakeFirebaseFirestore();
     await firestore.collection('users').doc('seeker-1').set({
-      'displayName': 'Jane Seeker',
+      'id': 'seeker-1',
       'email': 'jane@example.com',
+      'displayName': 'Jane Seeker',
       'phoneNumber': '+260977000001',
       'role': 'seeker',
+      'isBanned': false,
+      'isSuspended': false,
     });
-    await firestore.collection('users').doc('provider-1').set({
+    await firestore.collection('publicProfiles').doc('provider-1').set({
+      'id': 'provider-1',
+      'role': 'provider',
       'displayName': 'David Provider',
       'tradingName': 'Dave Plumbing',
-      'email': 'dave@example.com',
-      'phoneNumber': '+260977000002',
-      'role': 'provider',
+      'category': 'Plumbing',
+      'city': 'Lusaka',
+      'basePrice': 250,
+      'kycApproved': true,
+      'isBanned': false,
+      'isSuspended': false,
     });
   });
 
   group('FirebaseBookingService', () {
-    test('createBooking writes booking with seeker and provider contact info',
-        () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
+    test('createBooking writes non-PII provider display data only', () async {
+      final bookingService = FirebaseBookingService(firestore: firestore);
 
       final id = await bookingService.createBooking(
         seekerId: 'seeker-1',
@@ -47,23 +49,22 @@ void main() {
 
       final doc = await firestore.collection('bookings').doc(id).get();
       expect(doc.exists, isTrue);
+      final raw = doc.data()!;
+      expect(raw.containsKey('providerEmail'), isFalse);
+      expect(raw.containsKey('providerPhone'), isFalse);
+      expect(raw.containsKey('seekerEmail'), isFalse);
 
-      final booking = BookingModel.fromMap(doc.data()!);
+      final booking = BookingModel.fromMap(raw);
       expect(booking.status, BookingStatus.requested);
       expect(booking.seekerName, 'Jane Seeker');
-      expect(booking.seekerPhone, '+260977000001');
       expect(booking.providerName, 'Dave Plumbing');
-      expect(booking.providerEmail, 'dave@example.com');
       expect(booking.price, 250);
     });
 
-    test('createBooking notifies the provider of the request', () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
+    test('createBooking does not create client-owned notifications', () async {
+      final bookingService = FirebaseBookingService(firestore: firestore);
 
-      final id = await bookingService.createBooking(
+      await bookingService.createBooking(
         seekerId: 'seeker-1',
         providerId: 'provider-1',
         serviceType: 'Plumbing',
@@ -72,24 +73,12 @@ void main() {
         price: 250,
       );
 
-      final notifications = await firestore
-          .collection('notifications')
-          .where('userId', isEqualTo: 'provider-1')
-          .get();
-      expect(notifications.docs, hasLength(1));
-      final notification =
-          NotificationModel.fromMap(notifications.docs.first.data());
-      expect(notification.type.name, 'bookingRequest');
-      expect(notification.relatedId, id);
-      expect(notification.isRead, isFalse);
+      final notifications = await firestore.collection('notifications').get();
+      expect(notifications.docs, isEmpty);
     });
 
-    test('createBooking persists the origin service and its price',
-        () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
+    test('createBooking persists the origin service and its price', () async {
+      final bookingService = FirebaseBookingService(firestore: firestore);
 
       final id = await bookingService.createBooking(
         seekerId: 'seeker-1',
@@ -104,8 +93,6 @@ void main() {
 
       final booking = BookingModel.fromMap(
           (await firestore.collection('bookings').doc(id).get()).data()!);
-      // The listed service price (K1,300) flows into the booking even
-      // when the provider's profile starting price differs.
       expect(booking.price, 1300);
       expect(booking.serviceId, 'svc-42');
       expect(booking.serviceName, 'Pine Plumbing Repair');
@@ -134,12 +121,9 @@ void main() {
       expect(booking.price, 1000);
     });
 
-    test('status transitions write timestamps and notify the seeker',
+    test('status transitions write timestamps without client notifications',
         () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
+      final bookingService = FirebaseBookingService(firestore: firestore);
 
       final id = await bookingService.createBooking(
         seekerId: 'seeker-1',
@@ -168,39 +152,20 @@ void main() {
       expect(booking.status, BookingStatus.completed);
       expect(booking.completedAt, isNotNull);
 
-      final seekerNotifications = await firestore
-          .collection('notifications')
-          .where('userId', isEqualTo: 'seeker-1')
-          .get();
-      final types = seekerNotifications.docs
-          .map((d) => NotificationModel.fromMap(d.data()).type)
-          .toList();
-      expect(
-        types,
-        containsAll([
-          NotificationType.bookingAccepted,
-          NotificationType.jobStarted,
-          NotificationType.jobCompleted,
-        ]),
-      );
+      final raw = (await firestore.collection('bookings').doc(id).get()).data()!;
+      expect(raw['updatedAt'], isNotNull);
+      expect((await firestore.collection('notifications').get()).docs, isEmpty);
     });
 
     test('updateBookingStatus is a no-op for an unknown booking', () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
-      // Must not throw.
+      final bookingService = FirebaseBookingService(firestore: firestore);
       await bookingService.updateBookingStatus(
           'does-not-exist', BookingStatus.accepted);
     });
 
     test('idempotent retry of an identical open request does not duplicate',
         () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
+      final bookingService = FirebaseBookingService(firestore: firestore);
 
       final id1 = await bookingService.createBooking(
         seekerId: 'seeker-1',
@@ -220,18 +185,36 @@ void main() {
       );
 
       expect(id2, id1);
-      final bookings = await firestore.collection('bookings').get();
-      expect(bookings.docs, hasLength(1));
-      // Only the initial provider notification, no retry spam.
-      final notifications = await firestore.collection('notifications').get();
-      expect(notifications.docs, hasLength(1));
+      expect((await firestore.collection('bookings').get()).docs, hasLength(1));
+      expect((await firestore.collection('notifications').get()).docs, isEmpty);
+    });
+
+    test('rejects a provider whose public profile is not discoverable',
+        () async {
+      await firestore.collection('publicProfiles').doc('hidden-1').set({
+        'role': 'provider',
+        'kycApproved': false,
+        'isBanned': false,
+        'isSuspended': false,
+      });
+      final bookingService = FirebaseBookingService(firestore: firestore);
+
+      await expectLater(
+        bookingService.createBooking(
+          seekerId: 'seeker-1',
+          providerId: 'hidden-1',
+          serviceType: 'Plumbing',
+          scheduledTime: DateTime(2026, 10, 20, 9, 30),
+          address: '12 Nakonde Road',
+          price: 250,
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect((await firestore.collection('bookings').get()).docs, isEmpty);
     });
 
     test('getBookingsForUser returns seeker bookings newest first', () async {
-      final bookingService = FirebaseBookingService(
-        notificationService: FirebaseNotificationService(firestore: firestore),
-        firestore: firestore,
-      );
+      final bookingService = FirebaseBookingService(firestore: firestore);
 
       final firstId = await bookingService.createBooking(
         seekerId: 'seeker-1',

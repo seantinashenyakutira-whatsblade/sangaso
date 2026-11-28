@@ -2,8 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/booking_model.dart';
-import '../models/notification_model.dart';
-import 'notification_service.dart';
+import '../models/public_profile_model.dart';
 
 abstract class BookingService {
   Future<String> createBooking({
@@ -24,14 +23,9 @@ abstract class BookingService {
 
 class FirebaseBookingService implements BookingService {
   final FirebaseFirestore? _firestoreOverride;
-  final NotificationService _notificationService;
 
-  // Constructor to receive NotificationService
-  FirebaseBookingService({
-    required NotificationService notificationService,
-    FirebaseFirestore? firestore,
-  })  : _notificationService = notificationService,
-        _firestoreOverride = firestore;
+  FirebaseBookingService({FirebaseFirestore? firestore})
+      : _firestoreOverride = firestore;
 
   FirebaseFirestore get _firestore =>
       _firestoreOverride ?? FirebaseFirestore.instance;
@@ -48,24 +42,30 @@ class FirebaseBookingService implements BookingService {
     String? serviceId,
     String? serviceName,
   }) async {
-    // Fetch seeker and provider details
+    // The seeker reads only their own document; the provider is read from the
+    // non-PII public projection because users/{uid} is self/admin-only.
     final seekerDoc = await _firestore.collection('users').doc(seekerId).get();
     final providerDoc = await _firestore
-        .collection('users')
+        .collection('publicProfiles')
         .doc(providerId)
         .get();
 
     if (!seekerDoc.exists || !providerDoc.exists) {
-      throw Exception('User not found');
+      throw StateError('Booking participant is not available.');
     }
 
     final seekerData = seekerDoc.data()!;
-    final providerData = providerDoc.data()!;
+    if (seekerData['isBanned'] == true || seekerData['isSuspended'] == true) {
+      throw StateError('This account cannot create bookings.');
+    }
+
+    final provider = PublicProfileModel.fromDoc(providerDoc);
+    if (!provider.isDiscoverable) {
+      throw StateError('This provider is not available for bookings.');
+    }
 
     // Stable idempotency key: a client retrying an identical request
-    // (same seeker, provider, slot and address) maps onto one booking
-    // instead of creating duplicates; the still-open booking is
-    // returned as-is without a second provider notification.
+    // (same seeker, provider, slot and address) maps onto one booking.
     final fingerprint =
         '$seekerId|$providerId|${scheduledTime.toUtc().millisecondsSinceEpoch}|${address.trim().toLowerCase()}';
     var id = const Uuid().v5(
@@ -93,34 +93,16 @@ class FirebaseBookingService implements BookingService {
       price: price,
       status: BookingStatus.requested,
       createdAt: DateTime.now(),
-      // Seeker contact info
-      seekerName:
-          seekerData['displayName'] ?? seekerData['email']?.split('@')[0],
-      seekerPhone: seekerData['phoneNumber'],
-      seekerEmail: seekerData['email'],
-      // Provider contact info
-      providerName:
-          providerData['tradingName'] ??
-          providerData['displayName'] ??
-          providerData['email']?.split('@')[0],
-      providerPhone: providerData['phoneNumber'],
-      providerEmail: providerData['email'],
+      // Non-PII display names only. Contacts and emails are not copied from
+      // users/{uid}; backend triggers own notification creation.
+      seekerName: seekerData['displayName'] as String?,
+      providerName: provider.tradingName ?? provider.displayName ?? 'Provider',
       specialInstructions: specialInstructions,
       serviceId: serviceId,
       serviceName: serviceName,
     );
 
     await _firestore.collection('bookings').doc(id).set(booking.toMap());
-
-    // Notify Provider
-    await _notificationService.createNotification(
-      userId: providerId,
-      title: 'New Booking Request',
-      message: 'You have a new request for $serviceType service.',
-      type: NotificationType.bookingRequest,
-      relatedId: id,
-    );
-
     return id;
   }
 
@@ -135,12 +117,12 @@ class FirebaseBookingService implements BookingService {
         .where(field, isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-          final bookings = snapshot.docs
-              .map((doc) => BookingModel.fromDoc(doc))
-              .toList();
-          bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return bookings;
-        });
+      final bookings = snapshot.docs
+          .map((doc) => BookingModel.fromDoc(doc))
+          .toList();
+      bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return bookings;
+    });
   }
 
   @override
@@ -151,10 +133,11 @@ class FirebaseBookingService implements BookingService {
     final doc = await _firestore.collection('bookings').doc(bookingId).get();
     if (!doc.exists) return;
 
-    final booking = BookingModel.fromDoc(doc);
-    final updateData = <String, dynamic>{'status': status.name};
+    final updateData = <String, dynamic>{
+      'status': status.name,
+      'updatedAt': Timestamp.now(),
+    };
 
-    // Track timestamps for status changes
     switch (status) {
       case BookingStatus.accepted:
         updateData['acceptedAt'] = Timestamp.now();
@@ -170,59 +153,6 @@ class FirebaseBookingService implements BookingService {
     }
 
     await _firestore.collection('bookings').doc(bookingId).update(updateData);
-
-    // Send notifications based on status change
-    String? title;
-    String? message;
-    NotificationType? type;
-    String recipientId = booking.seekerId; // Default recipient is seeker
-
-    switch (status) {
-      case BookingStatus.accepted:
-        title = 'Booking Accepted';
-        message =
-            '${booking.providerName ?? "Provider"} has accepted your booking.';
-        type = NotificationType.bookingAccepted;
-        break;
-      case BookingStatus.declined:
-        title = 'Booking Declined';
-        message =
-            '${booking.providerName ?? "Provider"} has declined your booking.';
-        type = NotificationType.bookingDeclined;
-        break;
-      case BookingStatus.inProgress:
-        title = 'Job Started';
-        message = '${booking.providerName ?? "Provider"} has started the job.';
-        type = NotificationType.jobStarted;
-        break;
-      case BookingStatus.completed:
-        title = 'Job Completed';
-        message = 'Your service has been completed. Please leave a review!';
-        type = NotificationType.jobCompleted;
-        break;
-      case BookingStatus.cancelled:
-        // If cancelled by seeker, notify provider
-        // If cancelled by provider (unlikely in this flow but possible), notify seeker
-        // For now assuming seeker cancels
-        recipientId = booking.providerId;
-        title = 'Booking Cancelled';
-        message =
-            '${booking.seekerName ?? "Customer"} has cancelled the booking.';
-        type = NotificationType.bookingCancelled;
-        break;
-      default:
-        break;
-    }
-
-    if (title != null && type != null) {
-      await _notificationService.createNotification(
-        userId: recipientId,
-        title: title,
-        message: message!,
-        type: type,
-        relatedId: bookingId,
-      );
-    }
   }
 
   Future<void> startJob(String bookingId) async {

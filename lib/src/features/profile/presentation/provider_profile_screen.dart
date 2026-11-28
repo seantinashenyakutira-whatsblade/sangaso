@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../../models/user_model.dart';
+import '../../../models/public_profile_model.dart';
 import '../../../models/review_model.dart';
 import '../../../services/review_service.dart';
 
@@ -16,7 +16,7 @@ class ProviderProfileScreen extends StatefulWidget {
 }
 
 class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
-  late final Future<UserModel?> _providerFuture;
+  late final Future<PublicProfileModel?> _providerFuture;
 
   @override
   void initState() {
@@ -26,13 +26,16 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     _providerFuture = _load();
   }
 
-  Future<UserModel?> _load() async {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.userId).get();
-    return doc.exists ? UserModel.fromMap(doc.data()!) : null;
+  Future<PublicProfileModel?> _load() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('publicProfiles')
+        .doc(widget.userId)
+        .get();
+    return doc.exists ? PublicProfileModel.fromDoc(doc) : null;
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<UserModel?>(
+  Widget build(BuildContext context) => FutureBuilder<PublicProfileModel?>(
     future: _providerFuture,
     builder: (ctx, snap) {
       if (snap.connectionState == ConnectionState.waiting) {

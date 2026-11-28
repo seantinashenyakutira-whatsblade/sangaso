@@ -4,15 +4,16 @@ import 'package:sangaso/src/models/notification_model.dart';
 
 import '../services/notification_service.dart';
 
-// ... Keep all your existing MockAuthService, MockBookingService, etc. ...
-
+/// In-memory notification service for previews/tests.
+///
+/// It intentionally exposes only the client-safe read/mark APIs; notification
+/// creation belongs to trusted backend Functions in the Firebase service.
 class MockNotificationService implements NotificationService {
   final List<NotificationModel> _notifications = [];
   final StreamController<List<NotificationModel>> _controller =
       StreamController<List<NotificationModel>>.broadcast();
 
   MockNotificationService() {
-    // Add some mock notifications for testing
     _notifications.addAll([
       NotificationModel(
         id: 'notification_1',
@@ -21,7 +22,7 @@ class MockNotificationService implements NotificationService {
         message: 'John Doe has requested your plumbing service',
         type: NotificationType.bookingRequest,
         relatedId: 'mock_booking_1',
-        isRead: false, // Changed to false for testing
+        isRead: false,
         createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       ),
       NotificationModel(
@@ -31,7 +32,7 @@ class MockNotificationService implements NotificationService {
         message: 'Your booking request has been accepted',
         type: NotificationType.bookingAccepted,
         relatedId: 'mock_booking_2',
-        isRead: false, // Changed to false for testing
+        isRead: false,
         createdAt: DateTime.now().subtract(const Duration(hours: 1)),
       ),
       NotificationModel(
@@ -46,46 +47,6 @@ class MockNotificationService implements NotificationService {
       ),
     ]);
     _controller.add(List.from(_notifications));
-  }
-
-  @override
-  Future<void> sendNotification({
-    required String userId,
-    required String title,
-    required String body,
-    String? type,
-    Map<String, dynamic>? data,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    // Mock implementation
-  }
-
-  @override
-  Future<void> createNotification({
-    required String userId,
-    required String title,
-    required String message,
-    required NotificationType type,
-    String? relatedId,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final notification = NotificationModel(
-      id: 'notification_${_notifications.length + 1}',
-      userId: userId,
-      title: title,
-      message: message,
-      type: type,
-      relatedId: relatedId,
-      isRead: false, // Always false for new notifications
-      createdAt: DateTime.now(),
-    );
-    _notifications.add(notification);
-    _controller.add(List.from(_notifications));
-  }
-
-  @override
-  Stream<Map<String, dynamic>> getNotifications(String userId) {
-    return Stream.value({});
   }
 
   @override
@@ -126,50 +87,11 @@ class MockNotificationService implements NotificationService {
 
   @override
   Future<void> checkNotificationData(String userId) async {
-    for (var notification in _notifications) {
+    for (final notification in _notifications) {
       if (notification.userId == userId) {
+        // Read-only probe, mirrors the Firebase implementation.
+        notification.isRead;
       }
     }
-  }
-
-  @override
-  Future<void> fixMissingIsReadFields(String userId) async {
-    // In mock, we don't need to fix anything since we control the data
-  }
-
-  // ADD THESE TWO NEW METHODS:
-  @override
-  Future<void> markAllAsUnread(String userId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    for (var i = 0; i < _notifications.length; i++) {
-      if (_notifications[i].userId == userId && _notifications[i].isRead) {
-        _notifications[i] = _notifications[i].copyWith(isRead: false);
-      }
-    }
-
-    _controller.add(List.from(_notifications));
-  }
-
-  @override
-  Future<void> createTestNotifications(String userId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    // Create 2 test notifications
-    await createNotification(
-      userId: userId,
-      title: 'Mock Test Notification 1',
-      message: 'This is a mock test notification created for testing',
-      type: NotificationType.system,
-    );
-
-    await createNotification(
-      userId: userId,
-      title: 'Mock Test Notification 2',
-      message: 'Another mock test notification with booking request',
-      type: NotificationType.bookingRequest,
-      relatedId: 'mock_test_booking_123',
-    );
-
   }
 }

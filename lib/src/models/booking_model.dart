@@ -69,8 +69,10 @@ class BookingModel {
     this.serviceName,
   });
 
+  /// Writes only present values. Nulls are omitted rather than stored as null
+  /// because strict rules validate optional contact fields only when present.
   Map<String, dynamic> toMap() {
-    return {
+    final data = <String, dynamic>{
       'id': id,
       'seekerId': seekerId,
       'providerId': providerId,
@@ -80,24 +82,33 @@ class BookingModel {
       'price': price,
       'status': status.name,
       'createdAt': Timestamp.fromDate(createdAt),
-      'seekerName': seekerName,
-      'seekerPhone': seekerPhone,
-      'seekerEmail': seekerEmail,
-      'providerName': providerName,
-      'providerPhone': providerPhone,
-      'providerEmail': providerEmail,
-      'specialInstructions': specialInstructions,
-      // The website reads the free-text note from `notes`; keep both fields
-      // in sync so a booking created on either client is readable on both.
-      'notes': specialInstructions,
-      'acceptedAt': acceptedAt != null ? Timestamp.fromDate(acceptedAt!) : null,
-      'startedAt': startedAt != null ? Timestamp.fromDate(startedAt!) : null,
-      'completedAt': completedAt != null
-          ? Timestamp.fromDate(completedAt!)
-          : null,
-      'serviceId': serviceId,
-      'serviceName': serviceName,
     };
+
+    void putIfPresent(String key, Object? value) {
+      if (value != null) {
+        data[key] = value;
+      }
+    }
+
+    putIfPresent('seekerName', seekerName);
+    putIfPresent('seekerPhone', seekerPhone);
+    putIfPresent('seekerEmail', seekerEmail);
+    putIfPresent('providerName', providerName);
+    putIfPresent('providerPhone', providerPhone);
+    putIfPresent('providerEmail', providerEmail);
+    putIfPresent('specialInstructions', specialInstructions);
+    // The website reads the free-text note from `notes`; keep both fields
+    // in sync so a booking created on either client is readable on both.
+    putIfPresent('notes', specialInstructions);
+    putIfPresent(
+        'acceptedAt', acceptedAt == null ? null : Timestamp.fromDate(acceptedAt!));
+    putIfPresent(
+        'startedAt', startedAt == null ? null : Timestamp.fromDate(startedAt!));
+    putIfPresent('completedAt',
+        completedAt == null ? null : Timestamp.fromDate(completedAt!));
+    putIfPresent('serviceId', serviceId);
+    putIfPresent('serviceName', serviceName);
+    return data;
   }
 
   factory BookingModel.fromMap(Map<String, dynamic> map) {

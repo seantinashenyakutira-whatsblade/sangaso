@@ -131,8 +131,8 @@ void main() async {
 
   final authService = FirebaseAuthService(authEmailService: authEmailService);
   final notificationService = FirebaseNotificationService();
-  final bookingService = FirebaseBookingService(notificationService: notificationService);
-  final messagingService = FirebaseMessagingService(notificationService: notificationService);
+  final bookingService = FirebaseBookingService();
+  final messagingService = FirebaseMessagingService();
   final reviewService = FirebaseReviewService();
   final serviceService = ServiceService();
   final emailVerificationService = FirebaseAuthEmailVerificationService(

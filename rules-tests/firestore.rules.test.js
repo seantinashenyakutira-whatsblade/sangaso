@@ -192,3 +192,81 @@ test('public profile projection is readable', async () => {
   const db = env.unauthenticatedContext().firestore();
   await assertSucceeds(db.collection('publicProfiles').doc('provider1').get());
 });
+
+test('seeker can create a booking without copying provider PII', async () => {
+  await seed(async (db) => {
+    await db.collection('users').doc('seeker1').set(userDoc('seeker1'));
+    await db.collection('users').doc('provider1').set(userDoc('provider1', 'provider'));
+  });
+  const db = env.authenticatedContext('seeker1', { email: 'seeker1@example.com' }).firestore();
+  await assertSucceeds(db.collection('bookings').doc('booking-new').set({
+    id: 'booking-new',
+    seekerId: 'seeker1',
+    providerId: 'provider1',
+    serviceType: 'Cleaning',
+    scheduledTime: Timestamp.fromMillis(Date.now() + 86400000),
+    address: 'Lusaka',
+    price: 100,
+    status: 'requested',
+    seekerName: 'seeker1',
+    providerName: 'provider1',
+    createdAt: Timestamp.now(),
+  }));
+});
+
+test('provider participant can accept a booking', async () => {
+  await seed(async (db) => {
+    await db.collection('users').doc('seeker1').set(userDoc('seeker1'));
+    await db.collection('users').doc('provider1').set(userDoc('provider1', 'provider'));
+    await db.collection('bookings').doc('booking1').set(bookingDoc('booking1', 'seeker1', 'provider1'));
+  });
+  const db = env.authenticatedContext('provider1', { email: 'provider1@example.com' }).firestore();
+  await assertSucceeds(db.collection('bookings').doc('booking1').update({
+    status: 'accepted',
+    acceptedAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  }));
+});
+
+test('client cannot write the public profile projection', async () => {
+  const db = env.authenticatedContext('provider1', { email: 'provider1@example.com' }).firestore();
+  await assertFails(db.collection('publicProfiles').doc('provider1').set({
+    role: 'provider',
+    displayName: 'Self promoted',
+    kycApproved: true,
+  }));
+});
+
+test('chat participant can send a message to the other participant', async () => {
+  await seed(async (db) => {
+    await db.collection('users').doc('seeker1').set(userDoc('seeker1'));
+    await db.collection('users').doc('provider1').set(userDoc('provider1', 'provider'));
+    await db.collection('bookings').doc('booking1').set(bookingDoc('booking1', 'seeker1', 'provider1'));
+  });
+  const db = env.authenticatedContext('seeker1', { email: 'seeker1@example.com' }).firestore();
+  await assertSucceeds(db.collection('bookings').doc('booking1').collection('messages').doc('m-valid').set({
+    bookingId: 'booking1',
+    senderId: 'seeker1',
+    receiverId: 'provider1',
+    text: 'Is 9am still good?',
+    timestamp: Timestamp.now(),
+    isRead: false,
+  }));
+});
+
+test('chat participant cannot spoof a third-party message recipient', async () => {
+  await seed(async (db) => {
+    await db.collection('users').doc('seeker1').set(userDoc('seeker1'));
+    await db.collection('users').doc('provider1').set(userDoc('provider1', 'provider'));
+    await db.collection('bookings').doc('booking1').set(bookingDoc('booking1', 'seeker1', 'provider1'));
+  });
+  const db = env.authenticatedContext('seeker1', { email: 'seeker1@example.com' }).firestore();
+  await assertFails(db.collection('bookings').doc('booking1').collection('messages').doc('m-spoof').set({
+    bookingId: 'booking1',
+    senderId: 'seeker1',
+    receiverId: 'victim',
+    text: 'Spoofed notification target',
+    timestamp: Timestamp.now(),
+    isRead: false,
+  }));
+});

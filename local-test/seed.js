@@ -202,6 +202,25 @@ function userFields(user) {
   return fields;
 }
 
+function publicProfileFields(user) {
+  const fields = {
+    role: str(user.role),
+    displayName: str(user.profile.displayName),
+    city: str(user.profile.city),
+    kycApproved: bool(true),
+    isBanned: bool(false),
+    isSuspended: bool(false),
+    updatedAt: ts('2026-01-01T00:00:00Z'),
+  };
+  if (user.role === 'provider') {
+    fields.tradingName = str('Sangaso Demo Provider');
+    fields.category = str('Cleaning');
+    fields.bio = str('Local emulator provider for end-to-end QA.');
+    fields.basePrice = { doubleValue: 250 };
+  }
+  return fields;
+}
+
 const serviceSpecs = [
   {
     id: 'svc-clean-001',
@@ -263,8 +282,14 @@ async function main() {
   await verifyPasswordSignIn(provider);
 
   for (const user of [seeker, provider]) {
-    const doc = await patchDocument('users', user.uid, userFields(user));
-    console.log(`Firestore seeded users/${user.uid} role=${user.role} (${doc.name})`);
+    const userDoc = await patchDocument('users', user.uid, userFields(user));
+    const profileDoc = await patchDocument(
+      'publicProfiles',
+      user.uid,
+      publicProfileFields(user),
+    );
+    console.log(`Firestore seeded users/${user.uid} role=${user.role} (${userDoc.name})`);
+    console.log(`Firestore seeded publicProfiles/${user.uid} role=${user.role} (${profileDoc.name})`);
   }
 
   for (const spec of serviceSpecs) {
@@ -300,6 +325,23 @@ async function main() {
     }
   }
 
+  const profileCheck = await listDocuments('publicProfiles');
+  const profiles = profileCheck.documents || [];
+  if (profiles.length !== 2) {
+    throw new Error(`Expected 2 public profile docs, found ${profiles.length}`);
+  }
+  for (const doc of profiles) {
+    const fields = doc.fields || {};
+    if (!seededUids.has(doc.name.split('/').pop())) {
+      throw new Error(`Unexpected public profile in local emulator: ${doc.name}`);
+    }
+    for (const forbidden of ['email', 'phoneNumber', 'address']) {
+      if (forbidden in fields) {
+        throw new Error(`Public profile leaks ${forbidden}: ${doc.name}`);
+      }
+    }
+  }
+
   fs.writeFileSync(
     path.join(__dirname, 'seed-state.json'),
     `${JSON.stringify(
@@ -317,7 +359,9 @@ async function main() {
   );
 
   console.log('Auth EMULATOR users verified with emailVerified=true and working passwords.');
-  console.log(`Seed verification PASS: ${users.length} users, ${services.length} services.`);
+  console.log(
+    `Seed verification PASS: ${users.length} users, ${profiles.length} public profiles, ${services.length} services.`,
+  );
   console.log(`SEEKER_UID=${seeker.uid}`);
   console.log(`PROVIDER_UID=${provider.uid}`);
 }

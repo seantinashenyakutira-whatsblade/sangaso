@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/message_model.dart';
-import '../models/notification_model.dart';
-import 'notification_service.dart';
 
 abstract class MessagingService {
   Stream<List<MessageModel>> getMessages(String bookingId);
@@ -29,14 +27,9 @@ class SenderNotAllowedException implements Exception {
 class FirebaseMessagingService implements MessagingService {
   final FirebaseFirestore? _firestoreOverride;
   final _uuid = const Uuid();
-  final NotificationService _notificationService;
 
-  // ✅ Constructor to receive NotificationService
-  FirebaseMessagingService({
-    required NotificationService notificationService,
-    FirebaseFirestore? firestore,
-  })  : _notificationService = notificationService,
-        _firestoreOverride = firestore;
+  FirebaseMessagingService({FirebaseFirestore? firestore})
+      : _firestoreOverride = firestore;
 
   FirebaseFirestore get _firestore =>
       _firestoreOverride ?? FirebaseFirestore.instance;
@@ -51,7 +44,7 @@ class FirebaseMessagingService implements MessagingService {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => MessageModel.fromMap(doc.data()))
+              .map((doc) => MessageModel.fromDoc(doc))
               .toList(),
         );
   }
@@ -67,7 +60,8 @@ class FirebaseMessagingService implements MessagingService {
       throw ArgumentError('A message needs text or an image before sending.');
     }
 
-    // Fetch booking first: the sender must be part of this conversation.
+    // The booking is readable only by its participants; Rules independently
+    // enforce that senderId and receiverId are the two booking participants.
     final bookingDoc =
         await _firestore.collection('bookings').doc(bookingId).get();
     if (!bookingDoc.exists) {
@@ -80,12 +74,16 @@ class FirebaseMessagingService implements MessagingService {
         (senderId != seekerId && senderId != providerId)) {
       throw SenderNotAllowedException(bookingId, senderId);
     }
+    final receiverId = senderId == seekerId ? providerId : seekerId;
+    if (receiverId == null || receiverId.isEmpty) {
+      throw StateError('Booking $bookingId has no message recipient.');
+    }
 
-    final id = _uuid.v4();
     final message = MessageModel(
-      id: id,
+      id: _uuid.v4(),
       bookingId: bookingId,
       senderId: senderId,
+      receiverId: receiverId,
       text: text,
       imageUrl: imageUrl,
       timestamp: DateTime.now(),
@@ -95,27 +93,7 @@ class FirebaseMessagingService implements MessagingService {
         .collection('bookings')
         .doc(bookingId)
         .collection('messages')
-        .doc(id)
+        .doc(message.id)
         .set(message.toMap());
-
-    // Determine recipient (the one who didn't send the message)
-    final recipientId = senderId == seekerId ? providerId : seekerId;
-
-    // Get sender name for notification
-    final senderDoc = await _firestore.collection('users').doc(senderId).get();
-    final senderName = senderDoc.exists
-        ? (senderDoc.data()?['displayName'] ?? 'User')
-        : 'User';
-
-    if (recipientId != null) {
-      await _notificationService.createNotification(
-        userId: recipientId,
-        title: 'New Message',
-        message:
-            '$senderName sent you a message: ${text.length > 80 ? '${text.substring(0, 80)}…' : text}',
-        type: NotificationType.newMessage,
-        relatedId: bookingId,
-      );
-    }
   }
 }

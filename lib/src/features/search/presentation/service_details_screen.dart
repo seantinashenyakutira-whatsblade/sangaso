@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../models/service_model.dart';
-import '../../../models/user_model.dart';
+import '../../../models/public_profile_model.dart';
 import '../../../services/review_service.dart';
 import '../../../models/review_model.dart';
 
@@ -46,13 +46,13 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     final service = ServiceModel.fromMap(serviceDoc.data()!);
 
     final providerDoc = await FirebaseFirestore.instance
-        .collection('users')
+        .collection('publicProfiles')
         .doc(service.providerId)
         .get();
 
-    UserModel? provider;
+    PublicProfileModel? provider;
     if (providerDoc.exists) {
-      provider = UserModel.fromMap(providerDoc.data()!);
+      provider = PublicProfileModel.fromDoc(providerDoc);
     }
 
     return {
@@ -106,7 +106,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
 
         final data = snapshot.data!;
         final service = data['service'] as ServiceModel;
-        final provider = data['provider'] as UserModel?;
+        final provider = data['provider'] as PublicProfileModel?;
 
         return Scaffold(
           body: CustomScrollView(

@@ -72,18 +72,6 @@ function isSelf(uid) {
   return isAuthenticated() && request.auth.uid == uid;
 }
 
-function userPath(uid) {
-  return /databases/$(database)/documents/users/$(uid);
-}
-
-function servicePath(id) {
-  return /databases/$(database)/documents/services/$(id);
-}
-
-function bookingPath(id) {
-  return /databases/$(database)/documents/bookings/$(id);
-}
-
 function hasAll(data, keys) {
   return data.keys().hasAll(keys);
 }
@@ -224,11 +212,17 @@ function isValidBookingData(data) {
 
 function isValidMessageData(data) {
   return hasAll(data, ['bookingId', 'senderId', 'receiverId', 'text', 'timestamp', 'isRead'])
-    && hasOnly(data, ['bookingId', 'senderId', 'receiverId', 'text', 'timestamp', 'isRead'])
+    && hasOnly(data, [
+      'bookingId', 'senderId', 'receiverId', 'text', 'imageUrl',
+      'timestamp', 'isRead'
+    ])
     && isBoundedString(data.bookingId, 128)
     && isBoundedString(data.senderId, 128)
     && isBoundedString(data.receiverId, 128)
     && isBoundedString(data.text, 2000)
+    && (!('imageUrl' in data)
+      || data.imageUrl == null
+      || (isBoundedString(data.imageUrl, 500) && data.imageUrl.matches('^https://.*')))
     && data.timestamp is timestamp
     && data.isRead is bool;
 }
@@ -264,6 +258,18 @@ function isValidReviewData(data) {
 // ===============================================================
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Path helpers must live where the `database` match variable is in scope.
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function servicePath(id) {
+      return /databases/$(database)/documents/services/$(id);
+    }
+
+    function bookingPath(id) {
+      return /databases/$(database)/documents/bookings/$(id);
+    }
 
     match /users/{userId} {
       allow get: if isSelf(userId) || isAdmin();
@@ -428,6 +434,9 @@ service cloud.firestore {
           && isValidMessageData(request.resource.data)
           && request.resource.data.bookingId == bookingId
           && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.receiverId != request.auth.uid
+          && request.resource.data.receiverId
+            in [parentBooking().seekerId, parentBooking().providerId]
           && isParticipant();
 
         allow update: if isAuthenticated()
